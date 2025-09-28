@@ -1,0 +1,1931 @@
+{
+  "name": "Attachment_Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "={{ $json.fileKey }}",
+        "options": {
+          "joinPages": true,
+          "keepSource": "both"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -5152,
+        304
+      ],
+      "id": "d8cc914e-8b08-4eb9-b4d0-a2f9f54fc295",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node['Gmail trigger'].json.from.value[0].address }}",
+        "subject": "=RE:{{ $node['Gmail trigger'].json.subject }}- Document Review",
+        "emailType": "text",
+        "message": "=Thank you for your document. After review, I am unable to sign it at this time. \n\nPlease contact me if you have any questions.\nRegards,\n[Sai San Mine]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -272,
+        432
+      ],
+      "id": "0b45f8f2-f68d-461c-9481-f9615564b63b",
+      "name": "Sent Reply",
+      "webhookId": "f14b8748-595c-4592-b501-edc0b505cba3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "=1654875360",
+        "message": "=📩 You received an email that requires your signature!\n\n✉️ From: {{$node[\"Gmail trigger\"].json.headers.from}}\n\n🧑 Student Name: {{ $json.studentName }}\n🆔 Student ID: {{ $json.studentID }}\n📊 Current GPAX: {{ $json.extractedGPAX }}\n✅ Condition: {{ $json.message }}\n\nDo you approve signing this document?\nReply with 'Yes' to approve or 'No' to decline.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1440,
+        224
+      ],
+      "id": "4ffd24db-f4a7-48a6-8758-a531c167c4f4",
+      "name": "Sent Noti",
+      "webhookId": "5a6163a0-930b-4073-bfbf-857020d01a9d",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all(); \nconst combinedBinary = {}; \nconst extractedTexts = [];\n\n// Initialize sender variables with defaults \nlet sender = \"Unknown\";\nlet senderName = \"Unknown\"; \n\n// Process all inputs (from both Extract from File operations) \ninputs.forEach((input, index) => { \n  // Extract sender email from input - check multiple possible locations\n  if (sender === \"Unknown\") { \n    sender = input.json?.senderEmail || \n             input.json?.sender || \n             input.json?.from?.value?.[0]?.address || \n             \"Unknown\";\n  } \n  \n  // Extract sender name from input - check multiple possible locations\n  if (senderName === \"Unknown\") {\n    senderName = input.json?.senderName || \n                 input.json?.from?.value?.[0]?.name || \n                 \"Unknown\";\n  }\n\n  // Check if this input has binary data \n  if (input.binary) { \n    // Preserve all binary properties with their original keys \n    Object.keys(input.binary).forEach(key => { \n      // Keep original binary keys (data0, data1, etc.) \n      combinedBinary[key] = input.binary[key]; \n      \n      // Store the extracted text if available \n      if (input.json && input.json.text) { \n        extractedTexts.push({ key: key, text: input.json.text }); \n      } \n    }); \n  } \n}); \n\n// Create the output \nreturn { \n  json: { \n    // Store texts for AI analysis, but keep them separate and labeled \n    extractedTexts: extractedTexts, \n    \n    // Combined version for simple analysis \n    textForAnalysis: extractedTexts.map(item => \n      `==== DOCUMENT: ${item.key} ====\\n\\n${item.text}`\n    ).join('\\n\\n====NEXT DOCUMENT====\\n\\n') || \"⚠️ No text content found\", \n    \n    // Sender info \n    sender: sender,\n    senderName: senderName,\n    \n    // Metadata \n    attachmentCount: extractedTexts.length, \n    \"*workflow\": { \n      chain: [ \n        ...(inputs[0].json?.[\"*workflow\"]?.chain || []), \n        { \n          node: \"pass data\", \n          timestamp: new Date().toISOString(), \n          binaryPreserved: true, \n          attachmentCount: extractedTexts.length \n        } \n      ] \n    } \n  }, \n  \n  // Pass all binary items forward with their original keys \n  binary: combinedBinary, \n  \n  // Use pairedItem from first input \n  pairedItem: inputs[0].pairedItem \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4928,
+        304
+      ],
+      "id": "61801e07-d65f-42ac-86d9-6bd3e31580e8",
+      "name": "pass data"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Enhanced binary data handler with multi-file support.\n * Processes input data to extract and merge JSON and binary content.\n */\nfunction processInputData() {\n  const inputs = $input.all();\n\n  /**\n   * Extracts binary data sources from the input.\n   * @returns {Array<object>} An array of input objects containing binary data.\n   */\n  function findBinarySources() {\n    return inputs.filter(input => input.binary && Object.keys(input.binary).length > 0);\n  }\n\n  /**\n   * Extracts JSON data sources from the input.\n   * @returns {Array<object>} An array of input objects containing JSON data.\n   */\n  function findJsonSources() {\n    return inputs.filter(input => input.json && Object.keys(input.json).length > 0);\n  }\n\n  /**\n   * Merges all JSON data sources into a single object.\n   * Handles a special 'output' field for 'analysis' data.\n   * @param {Array<object>} sources - An array of JSON data source objects.\n   * @returns {object} The merged JSON object.\n   */\n  function mergeJsonData(sources) {\n    return sources.reduce((acc, source) => {\n      const sourceJson = source.json || {};\n      const analysis = sourceJson.output\n        ? typeof sourceJson.output === 'string'\n          ? JSON.parse(sourceJson.output)\n          : sourceJson.output\n        : undefined;\n\n      return {\n        ...acc,\n        ...sourceJson,\n        ...(analysis ? { analysis } : {}),\n      };\n    }, {});\n  }\n\n  /**\n   * Merges all binary data sources into a single object.\n   * @param {Array<object>} sources - An array of binary data source objects.\n   * @returns {object} The merged binary data object.\n   */\n  function mergeBinaryData(sources) {\n    return sources.reduce((acc, source) => ({ ...acc, ...(source.binary || {}) }), {});\n  }\n\n  const binarySources = findBinarySources();\n  const jsonSources = findJsonSources();\n  const mergedJson = mergeJsonData(jsonSources);\n  const mergedBinary = mergeBinaryData(binarySources);\n\n  const output = {\n    json: {\n      ...mergedJson,\n      containsSignatureKeywords: mergedJson.analysis?.containsSignatureKeywords || false,\n      _debug: {\n        binarySources: binarySources.map(b => Object.keys(b.binary)),\n        jsonSources: jsonSources.map(j => Object.keys(j.json)),\n      },\n    },\n    binary: mergedBinary,\n  };\n\n  // Add document info if available in the first binary data source (data0)\n  if (output.binary.data0) {\n    output.json.document = {\n      fileName: output.binary.data0.fileName || 'unknown.pdf',\n      fileSize: output.binary.data0.fileSize,\n      requiresSignature: output.json.containsSignatureKeywords,\n    };\n  }\n\n  return output;\n}\n\nreturn processInputData();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2000,
+        96
+      ],
+      "id": "9a815d0e-ff86-44d3-a1ae-eb63c851c262",
+      "name": "Binary Bridge"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bedf388d-b162-4f78-9527-2be727e3d925",
+              "leftValue": "={{ $json.data.approved.toString()}}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -752,
+        112
+      ],
+      "id": "dcd0715b-378b-40c7-8dff-0783c97f10b0",
+      "name": "If approve"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Processes all input items, merges binary data, and prepares the final output.\n */\nfunction processAllInputs() {\n  const allInputs = $input.all();\n\n  /**\n   * Merges binary data from all input items into a single object.\n   * @param {Array<object>} inputs - An array of input objects.\n   * @returns {object} The merged binary data.\n   */\n  function mergeAllBinaryData(inputs) {\n    return inputs.reduce((acc, input) => {\n      if (input?.binary) {\n        return { ...acc, ...input.binary };\n      }\n      return acc;\n    }, {});\n  }\n\n  const mergedBinary = mergeAllBinaryData(allInputs);\n\n  // Get the Telegram response (assuming it's the last input)\n  const telegramResponse = allInputs[allInputs.length - 1] || {};\n  const telegramJsonData = telegramResponse.json?.data || {};\n\n  // Prepare the base output structure\n  const output = {\n    json: {\n      data: {\n        approved: telegramJsonData.approved,\n        timestamp: new Date().toISOString(),\n      },\n      // Preserve all original JSON data from the first input\n      ...(allInputs[0]?.json || {}),\n    },\n    // Include ALL binary data\n    binary: mergedBinary,\n  };\n\n  // Debug info if no binaries found\n  if (Object.keys(mergedBinary).length === 0) {\n    output.json._debug = {\n      inputSources: allInputs.map((item, index) => ({\n        source: index === allInputs.length - 1 ? 'Telegram' : `Input ${index}`,\n        hasBinary: !!item?.binary,\n        binaryKeys: item?.binary ? Object.keys(item.binary) : [],\n      })),\n    };\n  }\n\n  return output;\n}\n\nreturn processAllInputs();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        112
+      ],
+      "id": "c8dd905d-d2f8-4c71-a740-6929a347b24a",
+      "name": "process the Telegram response"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "1654875360",
+        "message": "=🚨 Student GPAX Evaluation Result\n\n🧑 Student Name: {{ $json.studentName }}\n🆔 Student ID: {{ $json.studentID }}\n📊 Current GPAX: {{ $json.extractedGPAX }}\n\nDoes this student meet the required GPAX condition?\n✅ Condition:{{ $json.message }}\n\nWill you reject him/her ?",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Reject ",
+            "disapproveLabel": "Meet personally"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2016,
+        608
+      ],
+      "id": "60333a32-42bf-4de2-99c0-35b5fb347df4",
+      "name": "GPAX noti",
+      "webhookId": "e4879b51-d429-4d3d-b2fa-59365ab2b91b",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node['Gmail trigger'].json.from.value[0].address }}",
+        "subject": "=RE:{{ $node['Gmail trigger'].json.subject }}- Document Review",
+        "emailType": "text",
+        "message": "=Dear {{ $('GPAX qualifies').item.json.studentName }},\n            Thank you for submitting your academic transcript.  After reviewing your records, we regret to inform you that your current GPAX of {{ $('GPAX qualifies').item.json.extractedGPAX }} does not meet the minimum requirement for this opportunity.  We appreciate your interest, and encourage you to continue your academic efforts. Please feel free to apply again in the future if eligibility criteria are met.\nWarm regards,   \n[Sai San Mine]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1456,
+        544
+      ],
+      "id": "6c236139-a7cc-4f81-b8a7-b544b450d2ed",
+      "name": "Reject email",
+      "webhookId": "8c975358-1eaa-4f64-8ede-c2f397bf89c0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node['Gmail trigger'].json.from.value[0].address }}",
+        "subject": "=RE:{{ $node['Gmail trigger'].json.subject }}- Document Review",
+        "emailType": "text",
+        "message": "=Dear {{ $('GPAX qualifies').item.json.studentName }},\n            Thank you for submitting your academic transcript.  We have reviewed your GPAX of {{ $('GPAX qualifies').item.json.extractedGPAX }} , and we would like to invite you for a personal discussion regarding the next steps.  Please check your availability and let us know a suitable time to meet.\nBest regards,\n[Sai San Mine]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1456,
+        704
+      ],
+      "id": "a480afd9-3620-4397-8948-b718c6d71bda",
+      "name": "Meet up email",
+      "webhookId": "a7721fc9-d9cf-4edd-bd2b-b84e968e064f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1994238711,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit#gid=1994238711"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -4000,
+        624
+      ],
+      "id": "2d570e36-b448-4a53-99dd-aa50b3bc09c0",
+      "name": "Google Sheets",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "UPcbv1AqUB6pj7bC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -3712,
+        496
+      ],
+      "id": "537e429f-8302-4f55-9688-ae6c757676bb",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Filters binary data to keep all Advisor-related PDF files and prepares the output.\n */\nfunction filterAndProcessBinaryData() {\n  const input = $input.first();\n  const inputBinary = input?.binary || {};\n  const inputJson = input?.json || {};\n  const filteredBinary = {};\n  let targetFileFound = false;\n\n  // Filter all advisor-related PDF binaries\n  for (const [key, binaryData] of Object.entries(inputBinary)) {\n    const fileName = binaryData?.fileName || '';\n    const isTarget =\n      fileName.toLowerCase().includes(\"advisor\") &&\n      fileName.toLowerCase().endsWith(\".pdf\");\n\n    if (isTarget) {\n      filteredBinary[key] = binaryData;\n      targetFileFound = true;\n    }\n  }\n\n  const binaryKeys = Object.keys(filteredBinary);\n  const output = {\n    json: {\n      ...inputJson,\n      info: targetFileFound\n        ? `Filtered advisor PDF files: ${binaryKeys.join(', ')}`\n        : 'No advisor-related PDF files found',\n      count: binaryKeys.length,\n      targetFileFound,\n      containsTargetFile: targetFileFound,\n    },\n    binary: filteredBinary,\n  };\n\n  return output;\n}\n\nreturn filterAndProcessBinaryData();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4320,
+        304
+      ],
+      "id": "05e0b6c0-dd8a-4c06-ade1-1045cbb0f386",
+      "name": "Filter binary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all();\nconst results = [];\nfor (const input of inputs) {\n  const text = input.json?.textForAnalysis || \"\";\n  const sender = input.json?.sender || input.json?.from?.value?.[0]?.address || \"Unknown\";\n  const senderName = input.json?.senderName || input.json?.from?.value?.[0]?.name || \"Unknown\";\n  \n  // === Extract Student ID ===\n  const studentIDMatch = text.match(/StudentCode\\s*:?[\\s]*?(\\d{10})/);\n  const studentID = studentIDMatch ? studentIDMatch[1] : \"Not found\";\n  \n  // === Extract Student Name (Mr./Ms./Mrs.) ===\n  const rawNameMatch = text.match(/(Mr\\.|Ms\\.|Mrs\\.)\\s+([A-Za-z]+\\s+){0,3}[A-Za-z]+/);\n  let studentName = rawNameMatch ? rawNameMatch[0].trim() : \"Not found\";\n  \n  // Fix duplication issues\n  if (studentName !== \"Not found\") {\n    // First, identify the title at the beginning (Mr./Mrs./Ms.)\n    const titlePrefixes = [\"Mr.\", \"Mrs.\", \"Ms.\"];\n    let prefix = \"\";\n    for (const titlePrefix of titlePrefixes) {\n      if (studentName.startsWith(titlePrefix)) {\n        prefix = titlePrefix;\n        break;\n      }\n    }\n    \n    // Now check for and remove title suffixes - with AND without periods\n    const suffixPatterns = [\"Mr\\\\.\", \"Mrs\\\\.\", \"Ms\\\\.\", \"Mr\", \"Mrs\", \"Ms\"];\n    \n    // Remove exact title suffixes at the end\n    for (const suffixPattern of suffixPatterns) {\n      const endSuffixRegex = new RegExp(`\\\\s+${suffixPattern}$`);\n      studentName = studentName.replace(endSuffixRegex, '');\n    }\n    \n    // Remove attached title suffixes (like MineMr or MineMr.)\n    for (const suffixPattern of suffixPatterns) {\n      const attachedSuffixRegex = new RegExp(`(\\\\w+)${suffixPattern}$`);\n      const combinedMatch = studentName.match(attachedSuffixRegex);\n      if (combinedMatch) {\n        const wordWithSuffix = combinedMatch[0];\n        const wordOnly = combinedMatch[1];\n        studentName = studentName.replace(wordWithSuffix, wordOnly);\n      }\n    }\n    \n    // Clean up any remaining duplicate words\n    const words = studentName.split(' ').filter(word => word.length > 0);\n    const uniqueWords = [];\n    \n    for (const word of words) {\n      if (!uniqueWords.includes(word)) {\n        uniqueWords.push(word);\n      }\n    }\n    \n    // Make sure we keep the original title prefix\n    if (prefix && !studentName.startsWith(prefix)) {\n      studentName = prefix + \" \" + uniqueWords.join(' ');\n    } else {\n      studentName = uniqueWords.join(' ');\n    }\n  }\n  \n  // === Extract GPAX ===\n  let gpax = null;\n  const gpaxBlocks = [...text.matchAll(/GPAXGPAX[\\s\\S]*?((\\d+\\s+)+\\d+\\.\\d+)/g)];\n  if (gpaxBlocks.length > 0) {\n    const lastBlock = gpaxBlocks[gpaxBlocks.length - 1][1];\n    const numbers = lastBlock.match(/[\\d.]+/g);\n    if (numbers && numbers.length > 0) {\n      gpax = parseFloat(numbers[numbers.length - 1]);\n    }\n  }\n  const containsGPAX = gpax !== null;\n  \n  // === Detect Signature Keywords ===\n  const signatureRegex = /(signature[\\s:.]*)|sign here|signed by|advisor\\/school's scholarship advisor/i;\n  const match = text.match(signatureRegex);\n  const containsSignatureKeyword = !!match;\n  const signatureEvidence = match ? match[0] : \"Not found\";\n  \n  results.push({\n    json: {\n      studentName,\n      studentID,\n      GPAX: gpax !== null ? gpax : \"Not found\",\n      containsGPAX,\n      containsSignatureKeyword,\n      signatureEvidence,\n      senderName: senderName,\n      senderEmail: sender,\n    }\n  });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4640,
+        496
+      ],
+      "id": "5bbc05f4-5fcb-4fa2-8a1d-3c398f223c31",
+      "name": "Detect keywords"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all();\nlet mergedData = {\n  extractedGPAX: null,\n  studentName: \"Unknown\",\n  studentID: \"Unknown\",\n  containsSignatureKeyword: false,\n  signatureEvidence: \"Not found\",\n  requiredGPAX: null,\n  qualifies: false,\n  message: \"\"\n};\nlet combinedBinary = null; // Will store the first binary it finds\n\n// First pass: collect all keys and merge data\nfor (const input of inputs) {\n  const json = input.json;\n  \n  // Merge all keys from the input\n  for (const key in json) {\n    // Special handling for known keys\n    if (key === \"GPAX\" && typeof json[key] === 'number') {\n      mergedData.extractedGPAX = json[key];\n    } else if (key === \"require GPAX\" && typeof json[key] === 'number') {\n      mergedData.requiredGPAX = json[key];\n    } else if (key === \"requiredGPAX\" && typeof json[key] === 'number') {\n      mergedData.requiredGPAX = json[key];\n    } else {\n      // Pass through all other keys\n      mergedData[key] = json[key];\n    }\n  }\n  \n  // Special handling for student info\n  if (json.studentName) mergedData.studentName = json.studentName;\n  if (json.studentID) mergedData.studentID = json.studentID;\n  if (typeof json.containsSignatureKeyword === 'boolean') {\n    mergedData.containsSignatureKeyword = json.containsSignatureKeyword;\n  }\n  if (json.signatureEvidence) {\n    mergedData.signatureEvidence = json.signatureEvidence;\n  }\n  \n  // If binary not assigned yet, grab it from this input\n  if (!combinedBinary && input.binary) {\n    combinedBinary = input.binary;\n  }\n}\n\n// Fail if required GPAX is not found\nif (mergedData.requiredGPAX === null) {\n  throw new Error(\"Missing required GPAX value from input (e.g., Google Sheets).\");\n}\n\n// Compare GPAX and determine eligibility\nmergedData.qualifies = mergedData.extractedGPAX !== null && \n                      mergedData.extractedGPAX >= mergedData.requiredGPAX;\n\nmergedData.message = mergedData.qualifies\n  ? `Student qualifies with GPAX of ${mergedData.extractedGPAX} (minimum required: ${mergedData.requiredGPAX})`\n  : `Student does not qualify. GPAX: ${mergedData.extractedGPAX}, minimum required: ${mergedData.requiredGPAX}`;\n\n// Return final result with all keys and optional binary\nreturn {\n  json: mergedData,\n  binary: combinedBinary || undefined\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2592,
+        352
+      ],
+      "id": "e9d2ec04-7ed4-48ee-9e3f-0e22bef0de79",
+      "name": "Check GPAX"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e5ba0bcc-dc15-485c-959c-7fae7e9f7f6c",
+              "leftValue": "={{ $json.qualifies.toString() }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "c1201532-f2c6-445b-8c8f-d03f6dfff8fb",
+              "leftValue": "={{ $json.containsSignatureKeyword.toString() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2352,
+        352
+      ],
+      "id": "6efa623e-e02d-4e3d-a737-e55571457ba3",
+      "name": "GPAX qualifies"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the original input data\nconst inputData = $input.first();\n\n// Create a copy of the original JSON data\nconst outputJson = { ...inputData.json };\n\n// Add our additional fields\noutputJson.timestamp = new Date().toISOString();\noutputJson.originalBinaryPresent = !!inputData.binary;\n\n// Return both the JSON with all original keys and the binary data\nreturn {\n  json: outputJson,\n  binary: inputData.binary\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1728,
+        96
+      ],
+      "id": "b76c097a-c18e-4a4e-b605-b9d8ce17c250",
+      "name": "Store binary"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -1168,
+        112
+      ],
+      "id": "36e38ee2-4657-40dc-b393-9d2f04bba0ed",
+      "name": "Merge Tele respond and attachment"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -5936,
+        304
+      ],
+      "id": "aa641ffe-4a77-45b5-9543-5f231d961b31",
+      "name": "When Executed by Another Workflow",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst outputItems = [];\n\nitems.forEach((item, emailIndex) => {\n  // Get sender email and sender name\n  const senderEmail = item.json?.from?.value?.[0]?.address || `sender${emailIndex}@example.com`;\n  const senderName = item.json?.from?.value?.[0]?.name || `Unknown Name`;\n\n  const timestamp = Date.now();\n\n  // Loop through each binary key (data0, data1, etc.)\n  for (const [binaryKey, binaryData] of Object.entries(item.binary || {})) {\n    const fileName = binaryData.fileName || \"unknown.pdf\";\n\n    // Create a truly unique ID based on filename + time + random\n    const safeFileName = fileName.replace(/[^a-zA-Z0-9_.-]/g, \"_\"); // Only clean the filename\n    const uniqueFileId = `${safeFileName}_${timestamp}_${Math.floor(Math.random() * 1000)}`;\n\n    // Push out the clean, split item\n    outputItems.push({\n      json: {\n        fileKey: uniqueFileId,        // to be used in Extract from File\n        fileName,\n        uniqueFileId,                 // used for merging later\n        senderEmail,                  // ✨ Correct email address\n        senderName,                   // ✨ Added sender name\n        originalKey: binaryKey         // optional, for debug\n      },\n      binary: {\n        [uniqueFileId]: binaryData     // binary key is unique and safe\n      }\n    });\n  }\n});\n\nreturn outputItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5392,
+        304
+      ],
+      "id": "7fc069b4-df48-428b-b52f-26f5ce822fd6",
+      "name": "Split + Unique ID + Sender Tagging"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "08020935-c4a3-451c-a57f-4e2b1c55312f",
+              "leftValue": "={{ $json.data.approved.toString()}}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1776,
+        608
+      ],
+      "id": "f73e6193-ff1b-4de1-a724-aa7a8b3bde55",
+      "name": "If Reject"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "105fd50b-1d42-430e-9c91-81b6d94d1e44",
+              "leftValue": "={{ $json.containsTargetFile.toString() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2992,
+        496
+      ],
+      "id": "7ca4ec9b-c366-4146-885e-165385c86e3d",
+      "name": "If Contain specific file"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 1,
+        "simple": false,
+        "filters": {
+          "q": "has:attachment to:me newer_than:9d from:*@lamduan.mfu.ac.th in:inbox -label:Processed_Scholarship -label:Rejected_Email"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "data",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -5680,
+        304
+      ],
+      "id": "73b75123-b4ca-4bbb-8cad-8ee58d164703",
+      "name": "Gmail trigger",
+      "webhookId": "26cf29d3-25c5-410b-8f62-731623654075",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "db303725-afa9-444b-ac15-10e850636894",
+              "leftValue": "={{ $json.containsGPAX.toString() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "1bde4407-3aee-4e11-9867-0ac72e70cec1",
+              "leftValue": "={{ $json.containsSignatureKeyword.toString() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4320,
+        656
+      ],
+      "id": "f7955fb6-c75d-49c0-a972-045f010ba660",
+      "name": "If have GPAX or Signature"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all();\nlet mergedJson = {};              // Combine JSON info if needed\nlet combinedBinary = {};          // This will store ALL binaries\n\nfor (const input of inputs) {\n  // Merge JSON data from all inputs (optional — you can modify this)\n  mergedJson = { ...mergedJson, ...input.json };\n\n  // Combine all binaries\n  if (input.binary) {\n    for (const [key, value] of Object.entries(input.binary)) {\n      combinedBinary[key] = value;\n    }\n  }\n}\n\nreturn {\n  json: {\n    ...mergedJson,\n    info: `Combined ${Object.keys(combinedBinary).length} binaries`,\n  },\n  binary: combinedBinary\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3328,
+        496
+      ],
+      "id": "09fabcbf-b6b1-41b5-a489-a0a0787901d7",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -272,
+        -96
+      ],
+      "id": "06f912a3-d8d9-4d42-ad5b-f07ab4645a32",
+      "name": "Image",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "UPcbv1AqUB6pj7bC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst returnItems = [];\n\nfor (const item of items) {\n  try {\n    // Create an object to hold all our Base64 encoded values\n    const base64Values = {};\n    \n    // Add the image if available\n    if (item.binary && item.binary.data) {\n      base64Values.base64Image = item.binary.data.data;\n    }\n    \n    // List of JSON fields to encode\n    const fieldsToEncode = [\n      'Professor Name', \n      'Position', \n      'School', \n      'Programme', \n      'Appointment'\n    ];\n    \n    // Encode each JSON field if it exists\n    for (const field of fieldsToEncode) {\n      if (item.json && item.json[field] !== undefined) {\n        // Convert the field value to string if it's not already\n        const stringValue = String(item.json[field]);\n        // Convert to Base64\n        const base64Value = Buffer.from(stringValue).toString('base64');\n        // Add to our result object with a clean key name (remove spaces)\n        base64Values[`base64${field.replace(/\\s+/g, '')}`] = base64Value;\n      }\n    }\n    \n    // Return a single object with all Base64 values\n    returnItems.push({\n      json: base64Values\n    });\n  } catch (error) {\n    returnItems.push({\n      json: {\n        error: error.message\n      }\n    });\n  }\n}\n\nreturn returnItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "5fcd960e-05b7-45fa-b9e8-45a71d1774c4",
+      "name": "Image to Base64"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst returnItems = [];\n\nfor (const item of items) {\n  try {\n    // Check for binary data\n    const binaryKeys = item.binary ? Object.keys(item.binary) : [];\n    if (binaryKeys.length === 0) throw new Error('No binary data');\n    \n    // Get binary PDF data\n    const binaryData = item.binary[binaryKeys[0]];\n    \n    // Check for studentName in JSON input\n    if (!item.json || !item.json.studentName) {\n      throw new Error('studentName is missing in input JSON');\n    }\n    \n    // Convert studentName to Base64\n    const studentNameBase64 = Buffer.from(item.json.studentName).toString('base64');\n    \n    // Return a single object with both encoded values\n    returnItems.push({\n      json: {\n        base64PDF: binaryData.data,\n        base64StudentName: studentNameBase64\n      }\n    });\n  } catch (error) {\n    returnItems.push({ json: { error: error.message } });\n  }\n}\n\n// Return only the first item if it exists, otherwise return an empty array\nreturn returnItems.length > 0 ? returnItems[0] : [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ],
+      "id": "5db6e4c7-3300-4415-bb32-afa9e8654914",
+      "name": "PDF to Base64"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst returnItems = [];\n\nfor (const item of items) {\n  if (item.binary?.data?.data) {\n    // Decode the base64-encoded JSON string\n    const jsonStr = Buffer.from(item.binary.data.data, 'base64').toString('utf8');\n    \n    try {\n      const parsed = JSON.parse(jsonStr);\n\n      // Extract the signed PDF Base64\n      returnItems.push({\n        json: {\n          signedPdfBase64: parsed.signedPdfBase64 || null,\n          status: parsed.status || null\n        }\n      });\n\n    } catch (err) {\n      returnItems.push({\n        json: {\n          error: 'Failed to parse Base64 JSON: ' + err.message\n        }\n      });\n    }\n  } else {\n    returnItems.push({\n      json: {\n        error: 'No binary Base64 JSON found'\n      }\n    });\n  }\n}\n\nreturn returnItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        96
+      ],
+      "id": "372a28c4-888d-4199-b955-37a7bc334868",
+      "name": "decode Base64"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        912,
+        96
+      ],
+      "id": "3218bc79-f915-4e83-a8d0-814945fa3b42",
+      "name": "Merge Base64",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://pdf-signer-s6rm.onrender.com/sign",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"pdfBase64\": \"{{$json['base64PDF']}}\",\n  \"imageBase64\": \"{{$json['base64Image']}}\",\n  \"textBase64\": \"{{$json['base64Text']}}\",\n  \"dateBase64\": \"{{$json['base64Date']}}\",\n  \"base64ProfessorName\": \"{{$json['base64ProfessorName']}}\",\n  \"base64Position\": \"{{$json['base64Position']}}\",\n  \"base64School\": \"{{$json['base64School']}}\",\n  \"base64Programme\": \"{{$json['base64Programme']}}\",\n  \"base64StudentName\": \"{{$json['base64StudentName']}}\",\n  \"base64Appointment\": \"{{$json['base64Appointment']}}\",\n  \"page\": 0,\n  \"width\": 150,\n  \"height\": 70,\n  \"textSize\": 12,\n  \"dateSize\": 10\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1136,
+        96
+      ],
+      "id": "78b0c675-29c7-43f3-b3e8-2f822b73d98a",
+      "name": "Sign the PDF",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json[\"Signature URL\"] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        -96
+      ],
+      "id": "1e558c74-2fd0-45db-9c94-46a01cc74ffa",
+      "name": "Download Image"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 354378280,
+          "mode": "list",
+          "cachedResultName": "Sheet3",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit#gid=354378280"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Time": "={{ $json.time }}",
+            "Date": "={{ $json.date }}",
+            "GPAX": "={{ $('If approve').item.json.extractedGPAX }}",
+            "Student Name ": "={{ $('If approve').item.json.studentName }}",
+            "ID": "={{ $('If approve').item.json.studentID }}",
+            "Email Adress": "={{ $('If approve').item.json.sender }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Student Name ",
+              "displayName": "Student Name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email Adress",
+              "displayName": "Email Adress",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "GPAX",
+              "displayName": "GPAX",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2368,
+        96
+      ],
+      "id": "6a9d3a12-1032-45ab-9910-d48921a3325f",
+      "name": "Record the Approval",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "UPcbv1AqUB6pj7bC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.all();\nconst results = [];\n\nfor (const input of inputs) {\n  const text = input.json?.textForAnalysis || \"\";\n  const sender = input.json?.sender || input.json?.from?.value?.[0]?.address || \"Unknown\";\n\n  // === Extract Student ID ===\n  const studentIDMatch = text.match(/StudentCode\\s*:?[\\s]*?(\\d{10})/);\n  const studentID = studentIDMatch ? studentIDMatch[1] : \"Not found\";\n\n  // === Extract Student Name (Mr./Ms./Mrs.) ===\n  const rawNameMatch = text.match(/(Mr\\.|Ms\\.|Mrs\\.)\\s+([A-Za-z]+\\s?){1,4}/);\n  let studentName = rawNameMatch ? rawNameMatch[0].trim() : \"Not found\";\n  studentName = studentName.replace(/(.+?)\\1+/, '$1'); // Deduplication\n\n  // === Extract GPAX ===\n  let gpax = null;\n  const gpaxBlocks = [...text.matchAll(/GPAXGPAX[\\s\\S]*?((\\d+\\s+)+\\d+\\.\\d+)/g)];\n  if (gpaxBlocks.length > 0) {\n    const lastBlock = gpaxBlocks[gpaxBlocks.length - 1][1];\n    const numbers = lastBlock.match(/[\\d.]+/g);\n    if (numbers && numbers.length > 0) {\n      gpax = parseFloat(numbers[numbers.length - 1]);\n    }\n  }\n\n  const containsGPAX = gpax !== null;\n\n  results.push({\n    json: {\n      studentName,\n      studentID,\n      GPAX: gpax !== null ? gpax : \"Not found\",\n      \n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        272
+      ],
+      "id": "46034dd7-deb3-4142-b128-55f55ca38280",
+      "name": "Approval Comment"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write the shortest possible approval message for:\n{\n  \"studentName\": \"{{ $json.studentName }}\",\n  \"studentID\": \"{{ $json.studentID }}\",\n  \"GPAX\": {{ $json.GPAX }}\n}",
+        "options": {
+          "systemMessage": "=You are an AI that writes brief approval statements as would appear on a scholarship qualification form. Write a short, professional note that an advisor would handwrite or stamp on a student's application form to confirm eligibility. This should be a simple endorsement statement, not addressed to anyone specific, as the student will physically carry this signed paper to the scholarship office."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        48,
+        272
+      ],
+      "id": "013554ea-af3f-4d6a-9877-470e2c0fc7e8",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "function convertToBase64(items) {\n  return items.map(item => {\n    // 1. Handle the AI Agent output text\n    let outputText;\n    \n    if (item.json && item.json.output) {\n      outputText = item.json.output;\n    } else if (item.output) {\n      outputText = item.output;\n    } else {\n      outputText = JSON.stringify(item);\n    }\n\n    // 2. Create Bangkok date in DD-MM-YYYY format\n    const bangkokDate = new Date().toLocaleString('en-GB', {\n      timeZone: 'Asia/Bangkok',\n      day: '2-digit',\n      month: '2-digit',\n      year: 'numeric'\n    }).replace(/\\//g, '-');\n\n    // 3. Return SINGLE object with both values\n    return {\n      json: {\n        base64Text: Buffer.from(outputText).toString('base64'),\n        base64Date: Buffer.from(bangkokDate).toString('base64'),\n      }\n    };\n  });\n}\n\nreturn convertToBase64($input.all());"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        272
+      ],
+      "id": "e78147f6-e28b-48d9-a489-7c469174a23e",
+      "name": "Text to Base64"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst returnItems = [];\n\nfor (const item of items) {\n  const base64String = item.json.signedPdfBase64;\n\n  if (base64String) {\n    returnItems.push({\n      json: {},\n      binary: {\n        data: {\n          data: base64String,\n          mimeType: 'application/pdf',\n          fileName: 'signed-document.pdf'\n        }\n      }\n    });\n  } else {\n    returnItems.push({\n      json: {\n        error: 'signedPdfBase64 not found'\n      }\n    });\n  }\n}\n\nreturn returnItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        96
+      ],
+      "id": "04d50fcf-2f6c-49d4-963e-b0c13481d177",
+      "name": "Base64 to PDF"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $node['Gmail trigger'].json.from.value[0].address }}",
+        "subject": "=RE:{{ $node['Gmail trigger'].json.subject }}- Document Review",
+        "message": "=Dear {{ $('If approve').item.json.studentName }},\n<br><br>\nAfter reviewing and considering your request, I have successfully signed your document. Please check and let me know if you need anything further.\n<br><br>\nBest regards,",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1856,
+        -16
+      ],
+      "id": "a06d1346-589c-4a14-a828-f64904936609",
+      "name": "Reply with attachment",
+      "webhookId": "569081ec-781c-47f6-b2c3-eedd28b0ab79",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "create",
+        "name": "=Processed_Scholarship",
+        "options": {
+          "labelListVisibility": "labelShow",
+          "messageListVisibility": "show"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3280,
+        176
+      ],
+      "id": "99e01df5-a9fd-4a8e-8a38-71999232ad9f",
+      "name": "create label",
+      "webhookId": "aed6a39e-6d13-4279-9ea3-eb7581366890",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.Id }}",
+        "labelIds": "={{ $json.Label }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3696,
+        80
+      ],
+      "id": "d635fd7a-0c2e-4344-a45b-39622097636f",
+      "name": "add label",
+      "webhookId": "6d887f11-14c2-456b-92c7-e11f3b9415e1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// This function checks if \"Processed_Scholarship\" label exists in the labels array\n// It logs the input for debugging and handles different data structures\n\n// Log the input for debugging\nconsole.log(\"Input data:\", $input.all());\n\n// Get all items from the input\nconst inputItems = $input.all();\nlet foundLabel = null;\n\n// Function to find the label in different data structures\nfunction findLabel(data) {\n  // Case 1: Direct array of labels\n  if (Array.isArray(data)) {\n    return data.find(label => \n      label.name === \"Processed_Scholarship\");\n  }\n  \n  // Case 2: Labels inside a 'labels' property\n  if (data.labels && Array.isArray(data.labels)) {\n    return data.labels.find(label => \n      label.name === \"Processed_Scholarship\");\n  }\n  \n  // Case 3: Single label object\n  if (data.name === \"Processed_Scholarship\") {\n    return data;\n  }\n  \n  return null;\n}\n\n// Check all possible input structures\nfor (const item of inputItems) {\n  const result = findLabel(item.json);\n  if (result) {\n    foundLabel = result;\n    break;\n  }\n}\n\n// Return the result\nreturn {\n  json: {\n    hasLabel: !!foundLabel,\n    labelId: foundLabel ? foundLabel.id : null,\n    // Include the full label object for debugging\n    label: foundLabel\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        96
+      ],
+      "id": "9d195d33-e8ac-4e27-86ff-8e221a2d1945",
+      "name": "check label exists"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f610cbc2-834d-4a6d-859e-c7d2daa31785",
+              "leftValue": "={{ $json.hasLabel.toString() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3056,
+        96
+      ],
+      "id": "ebeef166-29d6-4a65-a255-4d947f803c38",
+      "name": "If the label exist"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2592,
+        96
+      ],
+      "id": "8a746629-54c8-47dd-835b-60c38e8d8834",
+      "name": "Get Label ID",
+      "webhookId": "c5b7ff27-3000-44d7-9263-1612ba4924f2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"Label\": \"{{$('If the label exist').item.json.labelId || $('create label').item.json.id }}\",\n  \"Id\": \"{{ $('Gmail trigger').all()[0].json.id }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3488,
+        80
+      ],
+      "id": "ff3a762b-f37e-40d6-82b8-b11998d6df16",
+      "name": "Set label Id"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f14faa6f-c7d4-4b15-8fd7-0303c5da6914",
+              "name": "=result",
+              "value": "No document that needed Advisor signature",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2592,
+        672
+      ],
+      "id": "77761dfa-912f-4671-975b-422b110de760",
+      "name": "No document"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "23f852be-6299-46e5-aaba-716563bd3fb6",
+              "name": "result",
+              "value": "No Transcript or Advisor appointment documents are found",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4032,
+        848
+      ],
+      "id": "dd737e8c-df86-4eeb-98f6-6536c16ef316",
+      "name": "No documents"
+    },
+    {
+      "parameters": {
+        "chatId": "1654875360",
+        "text": "=📨 Document signed successfully.",
+        "additionalFields": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3888,
+        80
+      ],
+      "id": "5382ee4d-d689-4a46-b84e-7b9392f67091",
+      "name": "Telegram",
+      "webhookId": "db220a38-7b42-4aed-9558-f6639276de05",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        2176,
+        96
+      ],
+      "id": "ed8a249d-d1f2-4dc3-a9a3-392866e72cf6",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "create",
+        "name": "=Rejected_Email",
+        "options": {
+          "labelListVisibility": "labelShow",
+          "messageListVisibility": "show"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -400,
+        736
+      ],
+      "id": "394307a0-b7d1-4398-95d3-dcc6fc8a9ca8",
+      "name": "create label1",
+      "webhookId": "aed6a39e-6d13-4279-9ea3-eb7581366890",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.Id }}",
+        "labelIds": "={{ $json.Label }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        32,
+        624
+      ],
+      "id": "16c86464-70e9-47b1-af65-c78e7ed4d195",
+      "name": "add label1",
+      "webhookId": "6d887f11-14c2-456b-92c7-e11f3b9415e1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f610cbc2-834d-4a6d-859e-c7d2daa31785",
+              "leftValue": "={{ $json.hasLabel.toString() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -608,
+        656
+      ],
+      "id": "4a403c92-5956-4831-9c9f-6ba35c1ffd4f",
+      "name": "If the label exist1"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"Label\": \"{{$('If the label exist1').item.json.labelId || $('create label1').item.json.id }}\",\n  \"Id\": \"{{ $('Gmail trigger').all()[0].json.id }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -176,
+        624
+      ],
+      "id": "fd0c2f31-be6c-4ebd-afcc-59805892edf6",
+      "name": "Set label Id1"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1072,
+        656
+      ],
+      "id": "a73e6e94-b35e-48a7-be82-18f000c63ea4",
+      "name": "Get Label ID for reject",
+      "webhookId": "c5b7ff27-3000-44d7-9263-1612ba4924f2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// This function checks if \"Processed_Scholarship\" label exists in the labels array\n// It logs the input for debugging and handles different data structures\n\n// Log the input for debugging\nconsole.log(\"Input data:\", $input.all());\n\n// Get all items from the input\nconst inputItems = $input.all();\nlet foundLabel = null;\n\n// Function to find the label in different data structures\nfunction findLabel(data) {\n  // Case 1: Direct array of labels\n  if (Array.isArray(data)) {\n    return data.find(label => \n      label.name === \"Rejected_Email\");\n  }\n  \n  // Case 2: Labels inside a 'labels' property\n  if (data.labels && Array.isArray(data.labels)) {\n    return data.labels.find(label => \n      label.name === \"Rejected_Email\");\n  }\n  \n  // Case 3: Single label object\n  if (data.name === \"Rejected_Email\") {\n    return data;\n  }\n  \n  return null;\n}\n\n// Check all possible input structures\nfor (const item of inputItems) {\n  const result = findLabel(item.json);\n  if (result) {\n    foundLabel = result;\n    break;\n  }\n}\n\n// Return the result\nreturn {\n  json: {\n    hasLabel: !!foundLabel,\n    labelId: foundLabel ? foundLabel.id : null,\n    // Include the full label object for debugging\n    label: foundLabel\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        656
+      ],
+      "id": "3d4a0824-fe18-4388-9046-8ee08b9fac9c",
+      "name": "check label exists (Rejected)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get Bangkok timezone date/time\nconst dateOptions = {\n  timeZone: 'Asia/Bangkok',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric'\n};\n\nconst timeOptions = {\n  timeZone: 'Asia/Bangkok',\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit',\n  hour12: false\n};\n\n// Convert Gregorian year to Thai Buddhist Era (BE)\nconst gregorianDate = new Date().toLocaleDateString('en-GB', dateOptions);\nconst [day, month, year] = gregorianDate.split('/');\nconst thaiYear = parseInt(year) + 543; // Add 543 years\n\n// Format with Thai year\nconst thaiDate = `${day}-${month}-${thaiYear}`;\nconst currentTime = new Date().toLocaleTimeString('en-GB', timeOptions);\n\nreturn [{\n  json: {\n    date: thaiDate,  // Format: \"DD-MM-2567\"\n    time: currentTime // Format: \"HH:MM:SS\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        192
+      ],
+      "id": "e3096cc0-10a3-4fb7-b869-6519e395c3dd",
+      "name": "date and time"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        32,
+        464
+      ],
+      "id": "75e8fd2e-169a-49f2-bdf7-8b7840a6ef53",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "aXaLJfrzMDi64qFB",
+          "name": "DeepSeek account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "pass data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sent Noti": {
+      "main": [
+        [
+          {
+            "node": "Merge Tele respond and attachment",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "pass data": {
+      "main": [
+        [
+          {
+            "node": "Filter binary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Detect keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Binary Bridge": {
+      "main": [
+        [
+          {
+            "node": "Store binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If approve": {
+      "main": [
+        [
+          {
+            "node": "Image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PDF to Base64",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Approval Comment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sent Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process the Telegram response": {
+      "main": [
+        [
+          {
+            "node": "If approve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPAX noti": {
+      "main": [
+        [
+          {
+            "node": "If Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter binary": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect keywords": {
+      "main": [
+        [
+          {
+            "node": "If have GPAX or Signature",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check GPAX": {
+      "main": [
+        [
+          {
+            "node": "GPAX qualifies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPAX qualifies": {
+      "main": [
+        [
+          {
+            "node": "Binary Bridge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GPAX noti",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store binary": {
+      "main": [
+        [
+          {
+            "node": "Sent Noti",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Tele respond and attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Tele respond and attachment": {
+      "main": [
+        [
+          {
+            "node": "process the Telegram response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Gmail trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split + Unique ID + Sender Tagging": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Reject": {
+      "main": [
+        [
+          {
+            "node": "Reject email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Meet up email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Contain specific file": {
+      "main": [
+        [
+          {
+            "node": "Check GPAX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail trigger": {
+      "main": [
+        [
+          {
+            "node": "Split + Unique ID + Sender Tagging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If have GPAX or Signature": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "If Contain specific file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image to Base64": {
+      "main": [
+        [
+          {
+            "node": "Merge Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF to Base64": {
+      "main": [
+        [
+          {
+            "node": "Merge Base64",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "decode Base64": {
+      "main": [
+        [
+          {
+            "node": "Base64 to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Base64": {
+      "main": [
+        [
+          {
+            "node": "Sign the PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign the PDF": {
+      "main": [
+        [
+          {
+            "node": "decode Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Image to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record the Approval": {
+      "main": [
+        [
+          {
+            "node": "Get Label ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Comment": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Text to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text to Base64": {
+      "main": [
+        [
+          {
+            "node": "Merge Base64",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Base64 to PDF": {
+      "main": [
+        [
+          {
+            "node": "Reply with attachment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "date and time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply with attachment": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create label": {
+      "main": [
+        [
+          {
+            "node": "Set label Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add label": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check label exists": {
+      "main": [
+        [
+          {
+            "node": "If the label exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If the label exist": {
+      "main": [
+        [
+          {
+            "node": "Set label Id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "create label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Label ID": {
+      "main": [
+        [
+          {
+            "node": "check label exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set label Id": {
+      "main": [
+        [
+          {
+            "node": "add label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject email": {
+      "main": [
+        [
+          {
+            "node": "Get Label ID for reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Record the Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create label1": {
+      "main": [
+        [
+          {
+            "node": "Set label Id1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If the label exist1": {
+      "main": [
+        [
+          {
+            "node": "Set label Id1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "create label1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set label Id1": {
+      "main": [
+        [
+          {
+            "node": "add label1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meet up email": {
+      "main": [
+        [
+          {
+            "node": "Get Label ID for reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Label ID for reject": {
+      "main": [
+        [
+          {
+            "node": "check label exists (Rejected)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check label exists (Rejected)": {
+      "main": [
+        [
+          {
+            "node": "If the label exist1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sent Reply": {
+      "main": [
+        [
+          {
+            "node": "Get Label ID for reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "date and time": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1daaa779-eb87-4df4-9d8e-f93b5fbbb002",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f83e665d681201a40768a9ef3e52b2800e17400feef834756c69a4ed9a7c93c6"
+  },
+  "id": "Y4VI0CE14jnjTyv2",
+  "tags": []
+}

@@ -1,0 +1,189 @@
+{
+  "name": "Check_Event_Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "gmail content",
+              "type": "any"
+            },
+            {
+              "name": "meetingDate",
+              "type": "any"
+            },
+            {
+              "name": "startTime",
+              "type": "any"
+            },
+            {
+              "name": "endTime",
+              "type": "any"
+            },
+            {
+              "name": "currentTime",
+              "type": "any"
+            },
+            {
+              "name": "Timezone",
+              "type": "any"
+            },
+            {
+              "name": "startDateTime",
+              "type": "any"
+            },
+            {
+              "name": "endDateTime",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        -16
+      ],
+      "id": "dee7545d-b664-4908-82ba-11c6714be6c4",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "saisanmine.nov@gmail.com",
+          "mode": "list",
+          "cachedResultName": "saisanmine.nov@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $json.startDateTime }}",
+        "timeMax": "={{ $json.endDateTime }}",
+        "options": {
+          "timeZone": {
+            "__rl": true,
+            "value": "Asia/Bangkok",
+            "mode": "list",
+            "cachedResultName": "Asia/Bangkok"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        64
+      ],
+      "id": "7e00acbe-b30d-412a-b822-8bc2db8f231a",
+      "name": "Google Calendar",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "pibg6xpKXFYCtmmB",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "saisanmine.nov@gmail.com",
+          "mode": "list",
+          "cachedResultName": "saisanmine.nov@gmail.com"
+        },
+        "timeMin": "={{ $json.startDateTime }}",
+        "timeMax": "={{ $json.endDateTime }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -96
+      ],
+      "id": "525b7d87-4dff-490f-ab0b-2bf6450fada0",
+      "name": "Google Calendar1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "pibg6xpKXFYCtmmB",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {
+          "includeUnpaired": true
+        }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        16,
+        -16
+      ],
+      "id": "e52329e2-d064-4688-b760-4e652bc12163",
+      "name": "Merge",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Calendar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7c2713b5-4e6c-4c58-a419-716b359232f4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f83e665d681201a40768a9ef3e52b2800e17400feef834756c69a4ed9a7c93c6"
+  },
+  "id": "FZ0yiWQFYEmOJlSA",
+  "tags": []
+}

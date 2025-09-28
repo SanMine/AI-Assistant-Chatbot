@@ -1,0 +1,276 @@
+{
+  "name": "All_Email_Summarize_Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "q": "newer_than:1d -label:Social -label:Promotions"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -272,
+        -96
+      ],
+      "id": "8fd9183e-eed6-48ad-a1f2-22d57c85b1ba",
+      "name": "Gmail2",
+      "webhookId": "952618b9-3631-4a97-8d24-2961e296488a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=From: {{ $json.From }}\nTo: {{ $json.To }}\nSummary: {{ $json.snippet }}",
+        "options": {
+          "systemMessage": "=You are an assistant summarizing emails for a professor.\n\nYour task is to generate concise, one-line summaries for each email received in the past 24 hours.\n\n✅ For each summary, include:\n\nThe sender's name and email (e.g., Saisan Mine (saisanmine.nov@gmail.com))\n\nThe recipient's email address (e.g., → professor@university.edu)\n\nThe main action (e.g., scheduled a meeting, submitted a form, confirmed payment)\n\nImportant context such as date, time, or topic (e.g., \"tomorrow, 9AM–12PM\" or \"April 30, 2025\")\n\n✅ Format:\n\nless\nCopy\nEdit\nSender Name (sender@email.com) → recipient@email.com: main action with context\n🚫 Do not include multiple summaries for the same event — combine similar ones into one clear summary.\n\n❌ Do not include greetings, explanations, headings, or bullet points.\n✅ Only output a list of summaries in the format above."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        400,
+        -16
+      ],
+      "id": "e51725ad-b9b8-42bd-b589-a8e5f2ed4777",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1749544558,
+          "mode": "list",
+          "cachedResultName": "Sheet4",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit#gid=1749544558"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -272,
+        96
+      ],
+      "id": "2f1923f3-d929-422e-9476-1934596c8d9d",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "UPcbv1AqUB6pj7bC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -16,
+        -16
+      ],
+      "id": "d0151c54-e483-4e88-bc73-d1a98f328e6e",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract raw summaries\nconst summaries = items.map(item => item.json.output);\n\n// Optional: cleanup function to remove any lingering headers or redundancy\nfunction normalizeEmailSummary(summary) {\n  return summary\n    .trim()\n    .replace(/^📨.*emails.*?:/i, '') // Remove repeated AI headers (just in case)\n    .replace(/\\s+/g, ' ') // Normalize whitespace\n    .trim();\n}\n\n// Deduplicate & normalize\nconst processedSummaries = summaries\n  .map(normalizeEmailSummary)\n  .filter((summary, index, self) => self.indexOf(summary) === index && summary.length > 0)\n  .filter((summary, index, self) => {\n    const isSubset = self.some((other, i) => i !== index && other.includes(summary));\n    return !isSubset;\n  });\n\n// Add numbering\nconst numberedList = processedSummaries.map((summary, index) => `${index + 1}. ${summary}`);\n\n// Final output\nconst mergedText = [\n  \"📨 *These are your summarized emails from the past 24 hours:*\",\n  \"\",\n  ...numberedList.map(line => `${line}\\n`)\n].join(\"\\n\");\n\nreturn [\n  {\n    json: {\n      message: mergedText.trim()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        -16
+      ],
+      "id": "fa1a01bd-0887-4ef0-8f4e-253deee71450",
+      "name": "Summary output"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dynamically split email vs. rule items\nconst emailItems = items.filter(item => item.json.From); // Check for capital \"From\"\nconst ruleItems = items.filter(item => item.json.field && item.json.match_type && item.json.value);\n\n// Case-insensitive match logic\nfunction matchesRule(email, rule) {\n  const field = rule.field?.toLowerCase();\n  const matchType = rule.match_type?.toLowerCase();\n  const value = rule.value?.toLowerCase();\n\n  // Try both lowercase and capitalized field names (like 'from' vs 'From')\n  let emailField = email[field] || email[field.charAt(0).toUpperCase() + field.slice(1)];\n  if (!emailField) return false;\n\n  let emailValue = emailField.toLowerCase();\n\n  // Special handling for extracting email address from \"From\"\n  if (field === 'from') {\n    const match = emailValue.match(/<(.+?)>/);\n    if (match) emailValue = match[1];\n  }\n\n  switch (matchType) {\n    case 'contains':\n      return emailValue.includes(value);\n    case 'equals':\n      return emailValue === value;\n    case 'startswith':\n      return emailValue.startsWith(value);\n    case 'endswith':\n      return emailValue.endsWith(value);\n    default:\n      return false;\n  }\n}\n\nconst matchingEmails = [];\n\nfor (const emailItem of emailItems) {\n  const email = emailItem.json;\n  let isBlocked = false;\n\n  for (const rule of ruleItems.map(r => r.json)) {\n    if (matchesRule(email, rule)) {\n      isBlocked = true;\n      break;\n    }\n  }\n\n  if (!isBlocked) {\n    matchingEmails.push({ json: email }); // Only keep if NOT blocked\n  }\n}\n\nreturn matchingEmails;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -16
+      ],
+      "id": "36d85f88-3263-4536-8821-63e5e76841f8",
+      "name": "Filter emails"
+    },
+    {
+      "parameters": {
+        "chatId": "1654875360",
+        "text": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        -16
+      ],
+      "id": "fa077dae-2072-4acb-b9cf-9fa633175de7",
+      "name": "Telegram",
+      "webhookId": "2299103b-4649-4146-89f8-6b5017030643",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        -16
+      ],
+      "id": "70a3bf3d-fe95-4f5d-84c2-6ba5256034f6",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        416,
+        192
+      ],
+      "id": "e3a6b8be-601d-4313-aab7-06361703a5f6",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "aXaLJfrzMDi64qFB",
+          "name": "DeepSeek account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Summary output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Filter emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter emails": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary output": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Gmail2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dda13bae-ee68-4d16-81b1-56c7a07c913f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f83e665d681201a40768a9ef3e52b2800e17400feef834756c69a4ed9a7c93c6"
+  },
+  "id": "LbKkTj6mQ2jKXB2v",
+  "tags": []
+}

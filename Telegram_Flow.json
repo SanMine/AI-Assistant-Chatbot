@@ -1,0 +1,454 @@
+{
+  "name": "Telegram_Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "f5685fd9-622a-4b2f-96a5-e1577a4a7c5a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "text "
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "832f5029-03cd-4ef7-8ec1-244f27880f46",
+                    "leftValue": "={{ $json.message.voice.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "voice"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1472,
+        160
+      ],
+      "id": "117b0983-d94c-44ec-b78c-6385e8465d50",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "content": "## I'm a note \n** Still configuring about how to make the calendar understand which AI agent to be used."
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        416,
+        1712
+      ],
+      "typeVersion": 1,
+      "id": "079d9ebe-9880-48a9-8cf2-8ab3360df1d7",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Message: {{ $('Merge').item.json.message.text }}\nProfessor: {{ $json[\"Professor Name\"] }}",
+        "options": {
+          "systemMessage": "You are an assistant responsible for writing formal, polite emails from short Telegram messages.\n\nYou will receive:\n\nA recipient email\n\nA message to deliver\n\nA professor name for the signature\n\n🔒 Output only a raw valid JSON object, like:\n\n{\n  \"to\": \"recipient@example.com\",\n  \"subject\": \"Dinner Party Invitation\",\n  \"body\": \"Dear Sir/Madam,\\n\\nWe are pleased to invite you to a dinner party next week at 9:00 PM.\\n\\nBest regards,\\nProfessor Franco\"\n}\n✅ Important:\n\n✅ No markdown (no triple backticks)\n\n✅ Ensure the JSON is complete with a closing brace }\n\n✅ Use \\n only between paragraphs\n\n✅ Place Best regards, on its own line\n\n✅ The professor's name must appear after Best regards, on a new line\n\n❌ No extra commentary or explanations\n\nGood AI Output Example:\njson\nCopy\nEdit\n{\n  \"to\": \"6531503177@lamduan.mfu.ac.th\",\n  \"subject\": \"Dinner Party Invitation\",\n  \"body\": \"Dear Sir/Madam,\\n\\nWe are pleased to invite you to a dinner party next week at 9:00 PM.\\n\\nBest regards,\\nProfessor Ajarn. Franco\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        -672,
+        128
+      ],
+      "id": "43130a00-1218-4f7d-afe8-d551adbf7182",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/file/bot7956183905:AAE0Ii-WEzL13LE67g6_Pj8Do0GaEFVEjU4/voice/file_1.oga",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "voice.oga"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1024,
+        320
+      ],
+      "id": "db38ae87-8459-450a-aa84-8e951b8b594c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "command": "=whisper /data/voice.oga --output_format txt --output_dir /data\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        320
+      ],
+      "id": "301201c3-3661-489a-bc4e-03dedac4ed2e",
+      "name": "Execute Command",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Switch').item.json.message.text }}",
+        "contextWindowLength": 50
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -464,
+        400
+      ],
+      "id": "b17ada94-eaf1-412c-a859-5a498c35f98c",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1200,
+        48
+      ],
+      "id": "d1fd0c9d-779a-41bd-bfed-25f17311be2b",
+      "name": "Google Sheets",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "UPcbv1AqUB6pj7bC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -944,
+        128
+      ],
+      "id": "f824ea73-a226-4972-864f-a9a1eca5b747",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1232,
+        320
+      ],
+      "id": "fac150b8-29c9-4fad-9f91-0a81d822e349",
+      "name": "Telegram_Voice",
+      "webhookId": "1af33971-dd3b-4d5f-9325-8a4cd819195e",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Switch').item.json.message.chat.id }}",
+        "text": "={{ $json.status }}\n\nTo: {{ $json.to }}\nSubject: {{ $json.subject }}\n{{ $json.body }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "5dbc147f-4e52-466c-96f3-132c8926012e",
+      "name": "Telegram_Sent_Email",
+      "webhookId": "27436c23-3bf9-4e54-9943-6732011bf4bb",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        240
+      ],
+      "id": "9aa24d17-7b6d-4c66-8c04-099b799bab29",
+      "name": "Sent Email",
+      "webhookId": "1b2f3de3-5722-4206-a938-0eab6d5d5c79",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawOutput = $input.all()[0].json.output;\n\n// Remove non-JSON prefix like \"json\\nCopy\\nEdit\\n\"\nconst jsonStart = rawOutput.indexOf('{');\nconst cleaned = rawOutput.slice(jsonStart).trim();\n\ntry {\n  const parsed = JSON.parse(cleaned);\n\n  // Format line breaks in the body\n  let body = parsed.body.replace(/\\\\n/g, '\\n');\n\n  // Ensure proper newline after \"Best regards,\"\n  body = body.replace(/Best regards,(\\s)?(Professor.+)/, 'Best regards,\\n$2');\n\n  parsed.body = body;\n\n  return [{\n    json: {\n      ...parsed,\n      status: \"Email was successfully sent\"\n    }\n  }];\n} catch (err) {\n  return [{\n    json: {\n      status: \"Fail on senting email\",\n      error: \"Failed to parse cleaned JSON from AI Agent\",\n      original: rawOutput\n    }\n  }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        128
+      ],
+      "id": "e0d07515-36b1-4e28-8c04-f54a4d4b502f",
+      "name": "Convert to String"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1712,
+        160
+      ],
+      "id": "78396aff-790e-49b0-bdd9-6adab77fd00f",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        400
+      ],
+      "id": "0425e279-06f1-4d17-b5d8-b32c29900e76",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "aXaLJfrzMDi64qFB",
+          "name": "DeepSeek account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Telegram_Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Convert to String",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram_Voice": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to String": {
+      "main": [
+        [
+          {
+            "node": "Telegram_Sent_Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sent Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e01c872b-1c1b-40d2-8aa8-c451726aceb9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f83e665d681201a40768a9ef3e52b2800e17400feef834756c69a4ed9a7c93c6"
+  },
+  "id": "UixJDCp6fHN7GWSc",
+  "tags": []
+}

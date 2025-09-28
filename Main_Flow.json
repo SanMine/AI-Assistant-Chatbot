@@ -1,0 +1,1051 @@
+{
+  "name": "Main_Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "=1654875360",
+        "message": "Would you like to reschedule the event?",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅Yes",
+            "disapproveLabel": "❌ No"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1344,
+        352
+      ],
+      "id": "dd8f29e0-fdfb-444f-ad21-fa696eddf3b1",
+      "name": "Telegram1",
+      "webhookId": "a6532030-a30d-45f2-9864-4ea88b996768",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "L7nyAs2yH2tWbgvV",
+          "mode": "list",
+          "cachedResultName": "Check Event"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "startDateTime": "={{ $json.startDateTime }}",
+            "endDateTime": "={{ $json.endDateTime }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "gmail content",
+              "displayName": "gmail content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "meetingDate",
+              "displayName": "meetingDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "startTime",
+              "displayName": "startTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "endTime",
+              "displayName": "endTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "currentTime",
+              "displayName": "currentTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Timezone",
+              "displayName": "Timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "startDateTime",
+              "displayName": "startDateTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "endDateTime",
+              "displayName": "endDateTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -112,
+        -96
+      ],
+      "id": "77b93235-0e95-47b2-a7a2-d8d8819a9a31",
+      "name": "Execute Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        208,
+        -16
+      ],
+      "id": "df16bf06-fa0d-4119-ad69-2d02a6e9fd76",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.output }}{{ $('Checking dates and time').item.json.currentTime }}{{ $('Checking dates and time').item.json.timeZone }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant.\n\n- Summarize {{$json.emailContent}} separately with a short yet detailed explanation while including the title, date, and time.\nPresent summaries on separate lines for clarity (not in a single paragraph). No special characters.\n\n- Then, check the calendar data to determine if the user is available during the proposed time in the email.\n\n- If the user is available, respond with:\n\"You have a scheduled meeting {{meetingDate}} from {{startTime}} to {{endTime}} with {{senderName}}. After reviewing your calendar, you are free at this time. Do you want to add this event to your calendar?\"\n\n- If the user is not available, respond with:\n\"You have a scheduled meeting {{meetingDate}} from {{startTime}} to {{endTime}} with {{senderName}}. However, you already have another event at this time.\"\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        1344,
+        32
+      ],
+      "id": "11348d2d-bd78-4903-94a3-53f4c5631a1b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "saisanmine.nov@gmail.com",
+          "mode": "list",
+          "cachedResultName": "saisanmine.nov@gmail.com"
+        },
+        "start": "={{ $('Checking dates and time').item.json.startDateTime }}",
+        "end": "={{ $('Checking dates and time').item.json.endDateTime }}",
+        "additionalFields": {
+          "color": "5",
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', `from AI`, 'string') }}",
+          "location": "={{ $fromAI('Location', 'from AI', 'string') }}",
+          "showMeAs": "opaque",
+          "summary": "={{ $fromAI('Summary',\"short summary\") }}",
+          "visibility": "public"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        208
+      ],
+      "id": "d6ae44ac-41bb-4ad8-95a6-06041575f91e",
+      "name": "Google Calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "pibg6xpKXFYCtmmB",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14yYwbk9KbFO5BvPhIgDm7QicdWdL-KOAAIL47LY1r6Q/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1840,
+        256
+      ],
+      "id": "13c7462e-414a-4781-b611-9bf26c88d53c",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "UPcbv1AqUB6pj7bC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Code to check if emails exist from Gmail trigger\nconst inputItems = $input.all();\n\n// Check if we received any emails from the Gmail trigger\nif (inputItems.length > 0) {\n  const firstEmail = inputItems[0].json || {};\n  \n  // Get the subject and sender if they exist\n  const subject = firstEmail.Subject || firstEmail.subject || 'No subject';\n  const from = firstEmail.From || firstEmail.from || 'Unknown sender';\n  \n  // Check if this is a valid email with content\n  const hasValidContent = Object.keys(firstEmail).length > 0;\n  \n  if (hasValidContent) {\n    // Valid email exists\n    return [{\n      json: {\n        emailExists: true,\n        emailCount: inputItems.length,\n        message: `${inputItems.length} valid email(s) found`,\n        firstEmailSubject: subject,\n        firstEmailFrom: from,\n        emailDetails: firstEmail\n      }\n    }];\n  } else {\n    // Email object exists but has no content\n    return [{\n      json: {\n        emailExists: false,\n        emailCount: inputItems.length,\n        message: \"Email object exists but contains no data\",\n        reason: \"Empty email object\"\n      }\n    }];\n  }\n} else {\n  // No emails found\n  return [{\n    json: {\n      emailExists: false,\n      emailCount: 0,\n      message: \"No emails found\",\n      reason: \"No items from Gmail trigger\"\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        192
+      ],
+      "id": "1e1d9a78-bdff-4ebc-8943-cda174b1835e",
+      "name": "Check Email with Attachments"
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailContent = $json.emailContent || \"\";\nconst rawSender = $json.sender || \"{}\";\n// Parse sender JSON\nlet senderData;\ntry {\n  senderData = JSON.parse(rawSender);\n} catch (e) {\n  senderData = { value: [{ name: \"Unknown\", address: \"unknown@example.com\" }] };\n}\nconst senderName = senderData.value?.[0]?.name || \"Unknown\";\nconst senderEmail = senderData.value?.[0]?.address || \"unknown@example.com\";\n// === Time Setup (Bangkok) ===\nconst bangkokNow = new Date().toLocaleString(\"en-US\", { timeZone: \"Asia/Bangkok\" });\nconst today = new Date(bangkokNow);\nconst tomorrow = new Date(today);\ntomorrow.setDate(today.getDate() + 1);\nfunction formatDate(date) {\n  return date.toLocaleDateString(\"en-US\", {\n    day: \"numeric\", month: \"short\", year: \"numeric\", timeZone: \"Asia/Bangkok\"\n  });\n}\nconst formattedTomorrow = formatDate(tomorrow);\n// === Date Detection ===\nlet meetingDate = \"Not found\";\nlet hasDate = false;\nif (/tomorrow/i.test(emailContent)) {\n  meetingDate = formattedTomorrow;\n  hasDate = true;\n} else {\n  const dateMatch = emailContent.match(/\\b([A-Za-z]+\\s\\d{1,2})\\b/);\n  if (dateMatch) {\n    meetingDate = dateMatch[1];\n    hasDate = true;\n  }\n}\n// === Time Detection ===\nlet startTime = \"Not found\";\nlet endTime = \"Not found\";\nlet hasTime = false;\nconst timeRangeMatch = emailContent.match(/from\\s+(\\d{1,2}(:\\d{2})?\\s?(AM|PM))\\s+to\\s+(\\d{1,2}(:\\d{2})?\\s?(AM|PM))/i);\nif (timeRangeMatch) {\n  startTime = timeRangeMatch[1];\n  endTime = timeRangeMatch[4];\n  hasTime = true;\n}\n// ✅ Combine Date and Time\nconst hasDateAndTime = hasDate && hasTime;\n\n// Creating combined date and time strings in ISO format with Bangkok timezone (+07:00)\nlet startDateTime = \"Not found\";\nlet endDateTime = \"Not found\";\nif (hasDateAndTime) {\n  // Parse the date and time\n  const formatTimeToISO = (dateStr, timeStr) => {\n    // Parse the components\n    const dateParts = dateStr.split(\" \");\n    const month = new Date(`${dateParts[0]} 1, 2000`).getMonth(); // Convert month name to number\n    const day = parseInt(dateParts[1], 10);\n    const year = dateParts.length > 2 ? parseInt(dateParts[2], 10) : today.getFullYear();\n    \n    // Parse time\n    let hours = 0;\n    let minutes = 0;\n    const timeParts = timeStr.match(/(\\d+)(?::(\\d+))?\\s*(AM|PM)/i);\n    if (timeParts) {\n      hours = parseInt(timeParts[1], 10);\n      minutes = timeParts[2] ? parseInt(timeParts[2], 10) : 0;\n      \n      // Convert to 24-hour format\n      if (timeParts[3].toUpperCase() === \"PM\" && hours < 12) {\n        hours += 12;\n      } else if (timeParts[3].toUpperCase() === \"AM\" && hours === 12) {\n        hours = 0;\n      }\n    }\n    \n    // Create ISO string with Bangkok timezone (+07:00)\n    const date = new Date(year, month, day, hours, minutes);\n    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+07:00`;\n  };\n  \n  startDateTime = formatTimeToISO(meetingDate, startTime);\n  endDateTime = formatTimeToISO(meetingDate, endTime);\n}\n\n// === Final Output ===\nreturn [{\n  json: {\n    emailContent,\n    senderName,\n    senderEmail,\n    meetingDate,\n    startTime,\n    endTime,\n    startDateTime,  // New combined field\n    endDateTime,    // New combined field\n    hasDate,\n    hasTime,\n    hasDateAndTime,\n    currentTime: today.toISOString(),\n    timeZone: \"Asia/Bangkok\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        32
+      ],
+      "id": "5f30572b-4aa6-4a96-bf21-c57bb5e49d1a",
+      "name": "Checking dates and time"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6ef6a493-1d28-42a3-b40c-603fa6697fcc",
+              "leftValue": "={{ $json.hasDateAndTime }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -512,
+        32
+      ],
+      "id": "31abc52e-c456-447f-b872-082e0c46a8fd",
+      "name": "Date and Time"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -768,
+        528
+      ],
+      "id": "719d0589-428e-46a2-9f84-93a6e4d9ec2c",
+      "name": "Schedule summarize email",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -768,
+        352
+      ],
+      "id": "7024a38f-1d49-4a5f-9d18-ffbe837cc7f6",
+      "name": "Schedule email attachments",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "MRUHtg6gTrzZ1bYw",
+          "mode": "list",
+          "cachedResultName": "All_Email_Summarize"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -512,
+        416
+      ],
+      "id": "97d92788-0175-4e98-9629-78456517ce6a",
+      "name": "Execute All_Email_Summarize"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KPlfIAbk0pxMrWqz",
+          "mode": "list",
+          "cachedResultName": "Attachment"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -512,
+        192
+      ],
+      "id": "b22aa97f-8e91-4d47-b926-1f8dd6e25065",
+      "name": "Execute Email Attachment"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "OQTvM3FObSX0xQMM",
+          "mode": "list",
+          "cachedResultName": "Final Telegram"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -512,
+        608
+      ],
+      "id": "3dee9e74-1e00-4ab9-9c78-f285b5199771",
+      "name": "Execute Telegram"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function node to stop the workflow if emailExists is false\nconst inputItems = $input.all();\nconst item = inputItems[0];\n\n// Check if emailExists is false\nif (item.json.emailExists === false) {\n  // Return an empty array to stop the workflow\n  return [];\n} else {\n  // Continue the workflow by passing through all items\n  return inputItems;\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        192
+      ],
+      "id": "d87c29bc-f1f1-42f8-a089-7b29fdb101b0",
+      "name": "Stop Workflow"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -768,
+        704
+      ],
+      "id": "9ddc61a4-c5ac-476f-b280-7551febdc509",
+      "name": "Sent Email Telegram",
+      "webhookId": "58c6a050-804d-45e0-b3b3-8a5795266ee1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9acc9673-3ea3-4bc0-b2fc-f98add683d58",
+              "name": "emailContent",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "db44d89f-ea10-41ba-a26f-f5fdf8401aee",
+              "name": "sender",
+              "value": "={{ $json.from }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1040,
+        96
+      ],
+      "id": "7b2a9222-8957-4dad-857c-8a35324e73e5",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            },
+            {}
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "to:me newer_than:2d from:*@lamduan.mfu.ac.th in:inbox -label:Processed_Scholarship -label:Rejected_Email"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1248,
+        96
+      ],
+      "id": "e6769dd9-8e8e-4562-9a97-5e96dd761959",
+      "name": "Gmail Trigger",
+      "notesInFlow": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Assumes `items[0].json` contains the calendar event object\n\nreturn items.map(item => {\n  const data = item.json;\n\n  const { meetingDate, startTime, endTime, senderName } = data;\n  const isAvailable = data.available;\n\n  let outputText = \"\";\n\n  if (isAvailable) {\n    outputText = `You have a scheduled meeting ${meetingDate} from ${startTime} to ${endTime} with ${senderName}. After reviewing your calendar, you are free at this time. Do you want to add this event to your calendar?`;\n  } else {\n    outputText = `You have a scheduled meeting ${meetingDate} from ${startTime} to ${endTime} with ${senderName}. However, you already have another event at this time.`;\n  }\n\n  return {\n    json: {\n      output: outputText\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        176
+      ],
+      "id": "a48930fc-0040-431e-8c80-ce882e3d9068",
+      "name": "Compare"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "1654875360",
+        "message": "={{ $json.output }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Yes",
+            "disapproveLabel": "❌ No"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        688,
+        320
+      ],
+      "id": "6cd4f4b3-7646-4f82-b48d-4d13522ea2a5",
+      "name": "Add event",
+      "webhookId": "ce656c1c-0de9-4fd0-9f20-b25297dd97a0",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "67974dc5-9dcb-4c58-bad2-39eaa47bd7da",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        192
+      ],
+      "id": "c4c7df1b-ba65-4a5c-8488-7e9a7a22ec97",
+      "name": "If approved"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3d70b0be-a267-4259-bde5-ad2a4216b199",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        352
+      ],
+      "id": "90c02ca0-fcb3-4f2e-9b69-c0e8a27abf81",
+      "name": "If reschedule"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        848,
+        192
+      ],
+      "id": "a55e3b08-73d5-4125-9ad5-50b9d920666c",
+      "name": "Merge approve and data"
+    },
+    {
+      "parameters": {
+        "chatId": "=1654875360",
+        "text": "=Event added",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1840,
+        32
+      ],
+      "id": "ca71d477-8bd5-4f22-98de-41f9880fb163",
+      "name": "Status Telegram",
+      "webhookId": "a6532030-a30d-45f2-9864-4ea88b996768",
+      "credentials": {
+        "telegramApi": {
+          "id": "PNr1zI1PtdcMzbEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const senderName = $('Checking dates and time').item.json.senderName;\nconst meetingDate = $('Checking dates and time').item.json.meetingDate;\nconst startTime = $('Checking dates and time').item.json.startTime;\nconst endTime = $('Checking dates and time').item.json.endTime;\n\n// Get professor name from input data - corrected access path\n// This assumes the input data is provided directly to this node\nconst professorName = $input.item.json[\"Professor Name\"] || \"\";\n\n// Option 1: Use HTML formatting with proper width control\nconst emailMessageHTML = `\n<div style=\"max-width: 600px; word-wrap: break-word;\">\n<p>Dear ${senderName},</p>\n<p>Thank you for your invitation. I regret that I'm unable to join you on ${meetingDate} from ${startTime} to ${endTime}.</p>\n<p>I'm available to reschedule at a time that works better for your calendar. Please let me know some alternative dates and times that would be convenient for you.</p>\n<p>Best regards,<br>${professorName}</p>\n</div>\n`;\n\n// Option 2: If HTML isn't supported, use shorter sentences\nconst emailMessagePlain = \n`Dear ${senderName},\n\nThank you for your invitation. \nI regret that I'm unable to join you on ${meetingDate} \nfrom ${startTime} to ${endTime}.\n\nI'm available to reschedule at a time that works better for you.\nPlease let me know some alternative dates that would be convenient.\n\nBest regards,\n${professorName}`;\n\n// Choose which version to use based on your email sending configuration\nreturn [\n  {\n    json: {\n      // Use HTML version if your email sender supports HTML\n      message: emailMessageHTML,\n      // Or use plain text with shorter lines\n      // message: emailMessagePlain\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        256
+      ],
+      "id": "f11ee1f3-07c8-404a-a8c4-b73cbd0268ae",
+      "name": "Email text"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Checking dates and time').item.json.senderEmail }}",
+        "subject": "=RE:  {{ $('Gmail Trigger').item.json.subject }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2320,
+        256
+      ],
+      "id": "569edc53-09ed-45b0-b633-7f546c2b5fde",
+      "name": "Sent email",
+      "webhookId": "7cc958b0-25a6-48d3-a342-c0f01420bdc3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UceyqsKrstnDcbLP",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function node to stop the workflow if emailExists is false\nconst inputItems = $input.all();\nconst item = inputItems[0];\n\n// Check if emailExists is false\nif (item.json.emailExists === false) {\n  // Return an empty array to stop the workflow\n  return [];\n} else {\n  // Continue the workflow by passing through all items\n  return inputItems;\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        448
+      ],
+      "id": "826a0322-ccb9-4b98-af69-7a726109f52a",
+      "name": "Stop Workflow1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        208
+      ],
+      "id": "19f9366c-7673-4d46-b5be-b3f9403766da",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "aXaLJfrzMDi64qFB",
+          "name": "DeepSeek account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram1": {
+      "main": [
+        [
+          {
+            "node": "If reschedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Compare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Status Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Email text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email with Attachments": {
+      "main": [
+        [
+          {
+            "node": "Execute Email Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checking dates and time": {
+      "main": [
+        [
+          {
+            "node": "Date and Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date and Time": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Stop Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule summarize email": {
+      "main": [
+        [
+          {
+            "node": "Execute All_Email_Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule email attachments": {
+      "main": [
+        [
+          {
+            "node": "Execute Email Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute All_Email_Summarize": {
+      "main": [
+        [
+          {
+            "node": "Stop Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Email Attachment": {
+      "main": [
+        [
+          {
+            "node": "Stop Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Telegram": {
+      "main": [
+        [
+          {
+            "node": "Stop Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sent Email Telegram": {
+      "main": [
+        [
+          {
+            "node": "Execute Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Checking dates and time",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Email with Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare": {
+      "main": [
+        [
+          {
+            "node": "Add event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge approve and data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add event": {
+      "main": [
+        [
+          {
+            "node": "Merge approve and data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "If approved": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If reschedule": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Workflow1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge approve and data": {
+      "main": [
+        [
+          {
+            "node": "If approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email text": {
+      "main": [
+        [
+          {
+            "node": "Sent email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "16170c95-ce4b-4c2b-b578-794644f24dfb",
+  "meta": {
+    "instanceId": "f83e665d681201a40768a9ef3e52b2800e17400feef834756c69a4ed9a7c93c6"
+  },
+  "id": "kdgLNKz20S4p4N05",
+  "tags": []
+}
